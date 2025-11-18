@@ -1,0 +1,46 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tractian-ml-engineering-llm
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Logging configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - API_NAME=${API_NAME:-tractian-ml-engineering-llm}
+
+      # Application settings
+      - PYTHONUNBUFFERED=1
+
+    volumes:
+      # Persist vector store (using named volume)
+      - chroma-db:/app/chroma_db
+
+      # Persist database file (using named volume)
+      - tractian-db:/app/db_data
+
+      # Logs
+      - ./logs:/app/logs
+
+      # HuggingFace cache (mount host cache to avoid re-downloading models)
+      - ${USERPROFILE}/.cache/huggingface:/root/.cache/huggingface
+
+    env_file:
+      - .env
+
+    networks:
+      - tractian-network
+
+
+networks:
+  tractian-network:
+    driver: bridge
+
+volumes:
+  tractian-db:
+    driver: local
+  chroma-db:
+    driver: local

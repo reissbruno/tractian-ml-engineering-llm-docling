@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - Tractian RAG</title>
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <link rel="stylesheet" href="/static/css/chat.css">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-section">
+                    <img src="/static/images/tractian-logo.png" alt="Tractian Logo" class="sidebar-logo">
+                    <div class="assistant-info">
+                        <h2>Tractian RAG</h2>
+                        <span class="assistant-subtitle">AI Assistant</span>
+                    </div>
+                </div>
+                <button class="sidebar-toggle" id="sidebarToggle" title="Retrair sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <button class="new-chat-btn" id="newChatBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Nova conversa
+            </button>
+
+            <div class="conversations-list" id="conversationsList">
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <p>Nenhuma conversa ainda</p>
+                    <span>Clique em "Nova conversa" para começar</span>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-profile" id="userProfile">
+                    <div class="user-avatar">
+                        <span id="userInitials">U</span>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-name" id="userName">Usuário</span>
+                        <span class="user-status">Online</span>
+                    </div>
+                </div>
+                <button class="logout-btn" id="logoutBtn" title="Sair">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-main">
+            <div class="chat-header">
+                <h1 class="chat-title">Como posso ajudar?</h1>
+
+                <!-- Model Selector -->
+                <div class="model-selector">
+                    <button class="model-selector-btn" id="modelSelectorBtn">
+                        <span id="selectedModelName">GPT-4o Mini</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+
+                    <div class="model-dropdown" id="modelDropdown">
+                        <!-- Gemini Models -->
+                        <div class="model-group">
+                            <div class="model-group-title">Google Gemini</div>
+
+                            <div class="model-option" data-provider="gemini" data-model="gemini-2.5-pro">
+                                <div class="model-option-icon gemini">G</div>
+                                <div class="model-option-info">
+                                    <div class="model-option-name">Gemini 2.5 Pro</div>
+                                    <div class="model-option-desc">Modelo avançado multimodal</div>
+                                </div>
+                                <div class="model-option-check">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="model-option" data-provider="gemini" data-model="gemini-flash-latest">
+                                <div class="model-option-icon gemini">G</div>
+                                <div class="model-option-info">
+                                    <div class="model-option-name">Gemini Flash Latest</div>
+                                    <div class="model-option-desc">Modelo rápido e eficiente</div>
+                                </div>
+                                <div class="model-option-check">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="model-option" data-provider="gemini" data-model="gemini-2.5-flash">
+                                <div class="model-option-icon gemini">G</div>
+                                <div class="model-option-info">
+                                    <div class="model-option-name">Gemini 2.5 Flash</div>
+                                    <div class="model-option-desc">Balanceado entre velocidade e qualidade</div>
+                                </div>
+                                <div class="model-option-check">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- OpenAI Models -->
+                        <div class="model-group">
+                            <div class="model-group-title">OpenAI</div>
+
+                            <div class="model-option" data-provider="openai" data-model="gpt-5-nano-2025-08-07">
+                                <div class="model-option-icon openai">AI</div>
+                                <div class="model-option-info">
+                                    <div class="model-option-name">GPT-5 Nano</div>
+                                    <div class="model-option-desc">Modelo compacto de última geração</div>
+                                </div>
+                                <div class="model-option-check">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="model-option" data-provider="openai" data-model="gpt-4.1-nano-2025-04-14">
+                                <div class="model-option-icon openai">AI</div>
+                                <div class="model-option-info">
+                                    <div class="model-option-name">GPT-4.1 Nano</div>
+                                    <div class="model-option-desc">Versão otimizada do GPT-4</div>
+                                </div>
+                                <div class="model-option-check">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="model-option selected" data-provider="openai" data-model="gpt-4o-mini-2024-07-18">
+                                <div class="model-option-icon openai">AI</div>
+                                <div class="model-option-info">
+                                    <div class="model-option-name">GPT-4o Mini</div>
+                                    <div class="model-option-desc">Rápido e econômico</div>
+                                </div>
+                                <div class="model-option-check">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-section">
+                    <div class="welcome-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </div>
+                    <h2>Bem-vindo ao Tractian RAG</h2>
+                    <p>Faça perguntas sobre manuais técnicos, equipamentos e procedimentos</p>
+
+                    <div class="suggestion-cards">
+                        <button class="suggestion-card" data-prompt="Como funciona o sistema de monitoramento?">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                            <span>Como funciona o sistema de monitoramento?</span>
+                        </button>
+
+                        <button class="suggestion-card" data-prompt="Quais são os principais sensores?">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                            <span>Quais são os principais sensores?</span>
+                        </button>
+
+                        <button class="suggestion-card" data-prompt="Explique sobre manutenção preditiva">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            <span>Explique sobre manutenção preditiva</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-container">
+                <form class="chat-input-form" id="chatForm">
+                    <div class="input-wrapper">
+                        <textarea
+                            id="messageInput"
+                            placeholder="Pergunte qualquer coisa..."
+                            rows="1"
+                            maxlength="2000"
+                        ></textarea>
+                        <button type="submit" class="send-btn" id="sendBtn" disabled title="Enviar mensagem" aria-label="Enviar mensagem">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+                <div class="chat-footer-info">
+                    <span>O Tractian RAG pode cometer erros. Por isso, lembre-se de conferir informações relevantes.</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Markdown parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>
