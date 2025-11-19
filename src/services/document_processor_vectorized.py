@@ -79,12 +79,6 @@ async def process_single_document(
 
         logger.info(f"Markdown generated: {len(markdown_text)} characters, {len(images_info)} images")
 
-        if processor == "docling":
-            debug_path = f"debug_markdown_{doc_id}.md"
-            with open(debug_path, 'w', encoding='utf-8') as f:
-                f.write(markdown_text)
-            logger.info(f"DEBUG: Docling markdown saved to {debug_path}")
-
         # 2. Clean content (only for FastPDF, Docling comes clean)
         if processor == "fast":
             processing_status[doc_id].update({

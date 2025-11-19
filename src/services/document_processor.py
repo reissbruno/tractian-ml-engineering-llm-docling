@@ -453,24 +453,12 @@ async def process_document_background(file_path: str, doc_id: str, filename: str
             # Docling - complete processing with parallel workers
             markdown_content = await process_document_to_markdown_parallel(file_path, doc_id)
 
-        # Save markdown
-        markdown_dir = f"output_markdowns/user_{user_id}"
-        os.makedirs(markdown_dir, exist_ok=True)
-
-        # Markdown file name (same name as PDF, but with .md)
-        markdown_filename = Path(filename).stem + ".md"
-        markdown_path = os.path.join(markdown_dir, markdown_filename)
-
-        logger.info(f"Saving markdown to: {markdown_path}")
-        with open(markdown_path, 'w', encoding='utf-8') as f:
-            f.write(markdown_content)
-
-        # Update final status in memory
+        # Do NOT save markdown to disk (debug path removed).
+        # Keep processing status with size and timing only.
         processing_time = time.time() - processing_status[doc_id]["started_at"]
         processing_status[doc_id].update({
             "status": "completed",
             "message": f"Processing completed in {processing_time:.1f}s with parallel workers",
-            "markdown_path": markdown_path,
             "markdown_size": len(markdown_content),
             "completed_at": time.time()
         })
