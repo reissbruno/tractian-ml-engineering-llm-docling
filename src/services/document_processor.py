@@ -163,7 +163,7 @@ def process_pdf_batch(args):
         pipeline.generate_table_images = False
         pipeline.generate_parsed_pages = False
         pipeline.do_code_enrichment = False
-        pipeline.do_formula_enrichment = False
+        pipeline.do_formula_enrichment = True
         pipeline.ocr_batch_size = 16
         pipeline.layout_batch_size = 16
         pipeline.table_batch_size = 16
