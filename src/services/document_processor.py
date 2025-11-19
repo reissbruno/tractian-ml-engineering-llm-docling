@@ -4,24 +4,16 @@ Generates markdown from PDFs using parallel processing with isolated workers (by
 """
 
 import asyncio
-import json
 import multiprocessing
-import os
 import sys
 import tempfile
-import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, AsyncGenerator, List, Tuple
+from typing import List, Tuple
 
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 
 from src.logger import logger
-from src.services.constants import PROGRESS_MESSAGES
-
-# Store document processing status
-processing_status: Dict[str, Dict] = {}
 
 
 def get_optimal_worker_count() -> int:
@@ -262,10 +254,6 @@ async def process_document_to_markdown_parallel(file_path: str, doc_id: str) -> 
 
         logger.info(f"Batch size: {batch_size} pages | Workers: {max_workers}")
 
-        # Update status
-        if doc_id in processing_status:
-            processing_status[doc_id]["message"] = f"Processing {total_pages} pages in {max_workers} parallel workers..."
-
         # Split into batches
         batches, _ = split_pdf_into_batches(file_path, batch_size)
         logger.info(f"Total batches: {len(batches)}")
@@ -314,220 +302,6 @@ async def process_document_to_markdown_parallel(file_path: str, doc_id: str) -> 
             shutil.rmtree(temp_dir)
         except:
             pass
-
-
-async def progress_generator(doc_id: str) -> AsyncGenerator[str, None]:
-    """
-    Generates SSE (Server-Sent Events) events with rotating progress messages.
-
-    Args:
-        doc_id: ID of document being processed
-
-    Yields:
-        Formatted SSE events
-    """
-    # Send initial comment to establish connection
-    logger.info(f"Starting SSE stream for {doc_id}")
-    yield ": SSE connection established\n\n"
-
-    message_index = 0
-    no_status_count = 0  # Counter to avoid premature cancellation
-
-    while True:
-        status = processing_status.get(doc_id, {})
-        logger.debug(f"Current status for {doc_id}: {status}")
-
-        # If processing completed
-        if status.get("status") == "completed":
-            data = json.dumps({
-                "status": "completed",
-                "message": "Document processed successfully!",
-                "markdown_path": status.get('markdown_path', ''),
-                "markdown_size": status.get('markdown_size', 0)
-            })
-            yield f"data: {data}\n\n"
-            break
-
-        # If error occurred
-        if status.get("status") == "error":
-            error_msg = status.get('error', 'Unknown error')
-            data = json.dumps({"status": "error", "message": error_msg})
-            yield f"data: {data}\n\n"
-            break
-
-        # If no longer exists (cancelled) - but give time to initialize
-        if not status:
-            no_status_count += 1
-            # Only cancel after 30 attempts (10 minutes) without status
-            if no_status_count > 30:
-                data = json.dumps({"status": "cancelled", "message": "Processing cancelled or not started"})
-                yield f"data: {data}\n\n"
-                break
-            # Send first message while waiting
-            message = PROGRESS_MESSAGES[0]
-            data = json.dumps({"status": "processing", "message": message})
-            yield f"data: {data}\n\n"
-        else:
-            # Reset counter if status exists
-            no_status_count = 0
-
-            # Send rotating message
-            message = PROGRESS_MESSAGES[message_index % len(PROGRESS_MESSAGES)]
-            data = json.dumps({"status": "processing", "message": message})
-            sse_message = f"data: {data}\n\n"
-            logger.info(f"SSE enviando para {doc_id}: {message} (index: {message_index}) | Bytes: {len(sse_message)}")
-            logger.debug(f"Conteúdo SSE: {repr(sse_message)}")
-            yield sse_message
-            message_index += 1
-
-        await asyncio.sleep(5)  # Update every 5 seconds (for testing and providing "life")
-
-
-async def process_document_background(file_path: str, doc_id: str, filename: str, user_id: int, processor: str = "docling"):
-    """
-    Processes document in background generating markdown.
-
-    Args:
-        file_path: Path to PDF file
-        doc_id: Document ID
-        filename: Original file name
-        user_id: User ID
-        processor: Processor type ('docling' or 'fast')
-    """
-    try:
-        logger.info(f"Starting background processing: {doc_id} (processor: {processor})")
-
-        # Update initial status
-        processing_status[doc_id] = {
-            "status": "processing",
-            "stage": "starting",
-            "message": f"Starting processing with {processor.upper()}...",
-            "started_at": time.time(),
-            "processor": processor
-        }
-
-        # Choose processor
-        if processor == "fast":
-            # FastPDF - fast processing
-            from src.services.fast_pdf_processor import process_pdf_fast
-            from src.auth.database import SessionLocal, DocumentImage
-
-            # FastPDF doesn't need async, executes directly
-            result = process_pdf_fast(file_path, file_path + ".tmp.md", doc_id)
-
-            if not result['success']:
-                raise Exception(result.get('error', 'Unknown error in FastPDF'))
-
-            # Read generated content
-            with open(result['output_path'], 'r', encoding='utf-8') as f:
-                markdown_content = f.read()
-
-            # Save images to database
-            images_info = result.get('images_info', [])
-            if images_info:
-                db = SessionLocal()
-                try:
-                    for img_info in images_info:
-                        db_image = DocumentImage(
-                            id=img_info['id'],
-                            document_id=doc_id,
-                            page_number=img_info['page'],
-                            image_data=img_info['image_data'],
-                            image_format=img_info['image_format'],
-                            caption=f"Image from page {img_info['page']}"
-                        )
-                        db.add(db_image)
-
-                    db.commit()
-                    logger.info(f"FastPDF saved {len(images_info)} images to database")
-                except Exception as e:
-                    logger.error(f"Error saving images to database: {e}")
-                    db.rollback()
-                finally:
-                    db.close()
-
-            # Clean up temporary file
-            os.remove(result['output_path'])
-
-        else:
-            # Docling - complete processing with parallel workers
-            markdown_content = await process_document_to_markdown_parallel(file_path, doc_id)
-
-        # Do NOT save markdown to disk (debug path removed).
-        # Keep processing status with size and timing only.
-        processing_time = time.time() - processing_status[doc_id]["started_at"]
-        processing_status[doc_id].update({
-            "status": "completed",
-            "message": f"Processing completed in {processing_time:.1f}s with parallel workers",
-            "markdown_size": len(markdown_content),
-            "completed_at": time.time()
-        })
-
-        # IMPORTANT: Update status in database
-        from src.auth.database import SessionLocal, Document as DBDocument
-        db = SessionLocal()
-        try:
-            doc = db.query(DBDocument).filter(DBDocument.id == doc_id).first()
-            if doc:
-                doc.status = "completed"
-                doc.processed_at = datetime.utcnow()
-                # Count chunks (if chunk processing in the future)
-                # For now, leave as 0
-                db.commit()
-                logger.info(f"Status updated in database: {doc_id} -> completed")
-        finally:
-            db.close()
-
-        logger.info(f"Parallel processing completed: {doc_id} ({processing_time:.1f}s)")
-
-    except Exception as e:
-        logger.error(f"Error in parallel processing of {doc_id}: {str(e)}")
-
-        # Update status in memory
-        processing_status[doc_id] = {
-            "status": "error",
-            "error": str(e),
-            "failed_at": time.time()
-        }
-
-        # Update status in database
-        from src.auth.database import SessionLocal, Document as DBDocument
-        db = SessionLocal()
-        try:
-            doc = db.query(DBDocument).filter(DBDocument.id == doc_id).first()
-            if doc:
-                doc.status = "error"
-                doc.error_message = str(e)
-                db.commit()
-                logger.info(f"Error status updated in database: {doc_id} -> error")
-        finally:
-            db.close()
-
-        raise
-
-
-def get_processing_status(doc_id: str) -> Dict:
-    """
-    Returns the current processing status of a document.
-
-    Args:
-        doc_id: Document ID
-
-    Returns:
-        Dictionary with processing status
-    """
-    return processing_status.get(doc_id, {})
-
-
-def clear_processing_status(doc_id: str):
-    """
-    Removes a document's status from the cache.
-
-    Args:
-        doc_id: Document ID
-    """
-    if doc_id in processing_status:
-        del processing_status[doc_id]
 
 
 # Configure multiprocessing for Windows

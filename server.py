@@ -30,10 +30,6 @@ from src.models import (
 from src.logger import logger
 from src.auth.database import get_db, init_db, User, Document, DocumentImage
 from src.auth.auth import hash_password, verify_password, create_access_token
-from src.services.document_processor import (
-    process_document_background,
-    get_processing_status
-)
 from src.services.document_processor_vectorized import process_documents_batch
 from src.services.embeddings_service import get_embeddings_service
 from src.services.vector_store_service import get_vector_store_service
@@ -195,79 +191,6 @@ async def upload_documents_vectorized(
                 logger.warning(f"Nao foi possivel remover arquivo temporario {temp_path}: {e}")
 
 
-@app.post("/documents/upload")
-async def upload_document_async(
-    file: UploadFile = File(...),
-    processor: str = Form("fast"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(lambda: User(id=1, user_name="test"))
-):
-    logger.info(f"Processor received: '{processor}' | File: {file.filename}")
-
-    if file.content_type != 'application/pdf':
-        raise HTTPException(status_code=400, detail=f"File {file.filename} is not a PDF")
-
-    doc_id = str(uuid.uuid4())
-    logger.info(f"Processing file: {file.filename}")
-    content = await file.read()
-
-    pdf_base64 = base64.b64encode(content).decode('utf-8')
-
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', mode='wb')
-    temp_file.write(content)
-    temp_file.close()
-    file_path = temp_file.name
-
-    doc = Document(
-        id=doc_id,
-        user_id=current_user.id,
-        filename=file.filename,
-        file_path=None,
-        pdf_data=pdf_base64,
-        file_size=len(content),
-        status="processing",
-        created_at=datetime.utcnow()
-    )
-    db.add(doc)
-    db.commit()
-
-    if processor not in ['docling', 'fast']:
-        processor = 'fast'
-
-    asyncio.create_task(process_document_background(
-        file_path=file_path,
-        doc_id=doc_id,
-        user_id=current_user.id,
-        processor=processor
-    ))
-
-    return {
-        "message": "Document received and processing started",
-        "doc_id": doc_id,
-        "status": "processing"
-    }
-
-
-@app.get("/documents/{doc_id}/progress")
-async def track_document_progress(doc_id: str):
-    async def generate():
-        while True:
-            status = get_processing_status(doc_id)
-
-            yield f"data: {status['status']}|{status['progress']}|{status['message']}\n\n"
-
-            if status['status'] in ['completed', 'error']:
-                break
-
-            await asyncio.sleep(1)
-
-    return StreamingResponse(generate(), media_type="text/event-stream")
-
-
-@app.get("/documents/{doc_id}/status")
-async def get_document_status_endpoint(doc_id: str):
-    status = get_processing_status(doc_id)
-    return status
 
 
 @app.delete("/documents/{doc_id}")
